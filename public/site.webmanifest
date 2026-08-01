@@ -1,0 +1,13 @@
+{
+    "name": "Games",
+    "short_name": "Games",
+    "description": "Browser-based helpers for the games on the table — Qwixx scoresheets and a Phase 10 generator.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#18181b",
+    "theme_color": "#18181b",
+    "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+        { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    ]
+}
