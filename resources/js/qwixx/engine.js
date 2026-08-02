@@ -7,13 +7,17 @@
  *
  * Game state (persisted to localStorage by the UI layer):
  *
- *   { layout, mode: 'solo'|'duo', players: [{ rows: [{ crosses: [pos...],
- *     locked, closed }, ...4], penalties }] }
+ *   { layout, mode: 'solo'|'duo'|'multi', players: [{ rows: [{ crosses:
+ *     [pos...], locked, closed }, ...4], penalties }] }
  *
  * `crosses` holds crossed positions (0-10) ascending. `locked` means this
  * player crossed position 10 themselves (earning the bonus lock mark);
  * `closed` means the row was manually marked as locked by a player outside
  * this device. Everything else is derived.
+ *
+ * Every rule below reads the whole `players` array, so the same functions
+ * serve one sheet, two sheets on a tablet, or a room full of phones — a
+ * multiplayer game is just a state whose extra slices arrive over the wire.
  */
 
 export const LAST_POS = 10;
@@ -23,16 +27,21 @@ export const PENALTY_POINTS = 5;
 export const SCORE_TABLE = [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78];
 export const COLORS = ['red', 'yellow', 'green', 'blue'];
 
-export function newGame(layoutId, mode) {
-    const players = mode === 'duo' ? 2 : 1;
+/* A blank slice for one player: four empty rows and no penalties. */
+export function newPlayer() {
+    return {
+        rows: Array.from({ length: 4 }, () => ({ crosses: [], locked: false, closed: false })),
+        penalties: 0,
+    };
+}
 
+/* `playerCount` is only needed for multiplayer, where the roster size comes
+ * from the room; solo and duo derive it from the mode as they always have. */
+export function newGame(layoutId, mode, playerCount = mode === 'duo' ? 2 : 1) {
     return {
         layout: layoutId,
         mode,
-        players: Array.from({ length: players }, () => ({
-            rows: Array.from({ length: 4 }, () => ({ crosses: [], locked: false, closed: false })),
-            penalties: 0,
-        })),
+        players: Array.from({ length: Math.max(1, playerCount) }, newPlayer),
     };
 }
 
@@ -178,4 +187,27 @@ export function penaltyPoints(playerState) {
 
 export function total(layout, playerState) {
     return scoreByRow(layout, playerState).reduce((sum, score) => sum + score, 0) - penaltyPoints(playerState);
+}
+
+/* Every player's total, best first, for the standings strip and the results
+ * screen. Equal totals share a rank — Qwixx has no tie-break, so a tie is a
+ * shared win and every player on the top score is flagged as a winner.
+ * `names` is positional and optional; missing entries fall back to "Player N". */
+export function standings(layout, state, names = []) {
+    const rows = state.players.map((playerState, index) => ({
+        index,
+        name: names[index] || `Player ${index + 1}`,
+        total: total(layout, playerState),
+    }));
+
+    rows.sort((a, b) => b.total - a.total || a.index - b.index);
+
+    const best = rows.length ? rows[0].total : 0;
+
+    return rows.map((row) => ({
+        ...row,
+        // Standard competition ranking: 1, 2, 2, 4.
+        rank: rows.findIndex((other) => other.total === row.total) + 1,
+        winner: row.total === best,
+    }));
 }

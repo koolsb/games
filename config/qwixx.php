@@ -75,4 +75,26 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Multiplayer rooms
+    |--------------------------------------------------------------------------
+    |
+    | Rooms are throwaway: the rules run in each browser and the server only
+    | holds each player's sheet so the others can see locked rows, penalties
+    | and the final scores. They live in the cache under a sliding TTL, so an
+    | abandoned room evaporates on its own and a redeploy clears the lot.
+    |
+    | 'store' names the cache store explicitly rather than riding on
+    | cache.default, which is 'database' — and this app has no database.
+    | A deployment with more than one replica needs a shared store (redis).
+    */
+
+    'multiplayer' => [
+        'store' => env('QWIXX_ROOM_CACHE', 'file'),
+        'ttl_hours' => 24,
+        'max_players' => 8,
+        'name_max' => 14,
+    ],
+
 ];
