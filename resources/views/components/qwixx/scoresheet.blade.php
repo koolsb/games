@@ -85,9 +85,12 @@
             </div>
 
             {{-- In a room only the host deals the next game, so everyone's
-                 sheets clear at the same moment. --}}
+                 sheets clear at the same moment. The condition is baked into
+                 the x-show expression rather than wrapped around the tag:
+                 Blade directives can't live inside a component tag's
+                 attribute list. --}}
             <flux:modal.trigger name="reset-confirm">
-                <flux:button size="sm" variant="primary" @if ($mode === 'multi') x-show="isHost" x-cloak @endif>
+                <flux:button size="sm" variant="primary" x-show="{{ $mode === 'multi' ? 'isHost' : 'true' }}" x-cloak>
                     New game
                 </flux:button>
             </flux:modal.trigger>

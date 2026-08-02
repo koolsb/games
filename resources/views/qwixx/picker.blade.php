@@ -74,12 +74,15 @@
                                 2 players
                             </flux:button>
                         </div>
+                        {{-- Plain interpolation, not @js(): a component tag's
+                             attributes are compiled without directives. Layout
+                             ids are config-file slugs, so quoting is enough. --}}
                         <flux:modal.trigger name="host-game">
                             <flux:button
                                 variant="filled"
                                 icon="users"
                                 class="w-full"
-                                x-on:click="hostLayout = @js($layout->id)"
+                                x-on:click="hostLayout = '{{ $layout->id }}'"
                             >
                                 Multiplayer
                             </flux:button>
