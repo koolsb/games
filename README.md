@@ -7,11 +7,13 @@ Browser-based helpers for the games on the table, served as one app at
 | --- | --- |
 | `/` | Game menu |
 | `/qwixx` | [Qwixx](https://gamewright.com/product/Qwixx) scoresheets |
+| `/qwixx/room/{code}` | A Qwixx game several people play on their own devices |
 | `/phase10` | [Phase 10](https://en.wikipedia.org/wiki/Phase_10) game generator |
 
 Built with **Laravel 13 · Livewire 4 · Flux UI Pro · Tailwind 4 · Alpine.js**. No
 database, no login — each game's data lives in a config file, and Qwixx's game
-state lives in the browser's `localStorage`.
+state lives in the browser's `localStorage`. Multiplayer Qwixx games are the one
+piece of server-side state, and they live in the cache under a TTL.
 
 This repo replaces the separate `koolsb/qwixx` and `koolsb/phase10` repos.
 
@@ -29,19 +31,56 @@ exactly as it was.
 - **Rules enforced**: crosses go left to right; skipped cells are struck out; the
   final cell needs 5 crosses and earns the lock + bonus mark; tapping your most
   recent cross undoes it (mistake correction).
-- **Two modes**:
+- **Three modes**:
   - **Solo** — one sheet, sized for iPad/phone landscape, for playing along with
     a physical game.
   - **2 players** — both sheets on one iPad lying flat between the players, the
     top sheet rotated 180°. Locking a row locks it for the other player
-    automatically.
+    automatically. Both players can name themselves by tapping the name on
+    their sheet.
+  - **Multiplayer** — one player hosts from a layout card and reads out the
+    four-character code; everyone else joins from **Join a game** (or the
+    copied link) and plays on their own device. See below.
 - **Rows locked elsewhere**: the small circled button at a row's end marks a row
   locked by a player on paper. Per the rules' simultaneous-lock clause, a player
   with 5+ crosses can still take the final cell of a freshly locked row.
-- **Game over** banner when two rows are locked or four penalties are taken.
+- **Game over** banner when two rows are locked or four penalties are taken —
+  with the final standings and the winner in 2-player and multiplayer games.
 - **Screen wake lock** on by default (toggleable) so the iPad doesn't sleep
   mid-game, plus a full-screen toggle where the browser supports it.
 - **Reset** with a confirmation dialog.
+
+#### Multiplayer rooms
+
+A host picks a sheet, gets a four-character code (base32 minus the characters
+people misread — no `I`, `O`, `0` or `1`) and a lobby; everyone joins with the
+code, and the host taps **Start game**. Joining after the start is refused. The
+lobby, the sheet and the final scores are all states of one URL,
+`/qwixx/room/{code}`, which doubles as a share link.
+
+**The rules stay in the browser.** Each device runs the same
+[`engine.js`](resources/js/qwixx/engine.js) a solo game does, over a state whose
+extra player slices arrive from the server — so locking, the simultaneous-lock
+clause, penalties, game over and scoring are one implementation for all three
+modes. The server stores each player's slice and hands the roster back; it never
+inspects a sheet. A device pushes its own slice and polls the others every two
+seconds (`POST /qwixx/rooms/{code}/sync`, which is both push and poll), and the
+only thing a device is authoritative about is its own sheet — so a slow response
+can never undo a tap, and play continues offline and flushes on reconnect.
+
+Rooms live in the cache (`config('qwixx.multiplayer')`), keyed by code, under a
+sliding 24-hour TTL that every write refreshes:
+
+| Setting | Default | |
+| --- | --- | --- |
+| `QWIXX_ROOM_CACHE` | `file` | cache store holding rooms |
+| `ttl_hours` | 24 | refreshed on every write |
+| `max_players` | 8 | seats per room |
+
+Two consequences worth knowing: **a redeploy clears every in-progress game**, and
+the `file` store is per-container, so the deployment assumes **one replica**. For
+more than one, point `QWIXX_ROOM_CACHE` at a shared store (`redis`) — the code
+needs no change. There is still no database and no PVC.
 
 ### Phase 10 — `/phase10`
 
@@ -107,7 +146,11 @@ layout is malformed. The game page embeds the layout as JSON for the client; the
 rules engine is pure JavaScript in
 [`resources/js/qwixx/engine.js`](resources/js/qwixx/engine.js) and the Alpine glue
 that persists to `localStorage` (`qwixx.game.v1`) lives in
-[`resources/js/qwixx/game.js`](resources/js/qwixx/game.js).
+[`resources/js/qwixx/game.js`](resources/js/qwixx/game.js). Multiplayer adds
+[`resources/js/qwixx/room.js`](resources/js/qwixx/room.js) (transport and merging,
+no rules) on the client and, on the server,
+[`RoomStore`](app/Services/Qwixx/RoomStore.php) — the only thing that knows where
+rooms are kept — behind [`RoomController`](app/Http/Controllers/Qwixx/RoomController.php).
 
 ### Adding or removing phases
 
@@ -149,7 +192,7 @@ Open http://localhost:8000.
 
 ```bash
 php artisan test          # Pest (both game domains + pages)
-npm run test              # Vitest (Qwixx rules engine)
+npm run test              # Vitest (Qwixx rules engine + room sync)
 vendor/bin/pint           # format
 ```
 
@@ -181,5 +224,8 @@ Mirror the existing per-game setup: manifests at `apps/games/` (values) and
 this one is serving.
 
 The container serves on **:8080** (non-root), exposes `/health.php` for probes,
-and needs **no PVC and no database** — Qwixx game state lives in each device's
-browser and the phase library is rebuilt in memory per request.
+and needs **no PVC and no database** — Qwixx sheets live in each device's browser
+and the phase library is rebuilt in memory per request. Multiplayer rooms sit in
+the container's file cache, so keep the deployment at **one replica** (or set
+`QWIXX_ROOM_CACHE` to a shared store); a rollout ends any game in progress, which
+is why rooms are cheap to recreate — a new code takes one tap.

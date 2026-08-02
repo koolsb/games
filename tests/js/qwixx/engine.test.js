@@ -9,10 +9,12 @@ import {
     lockedRowCount,
     marksByRow,
     newGame,
+    newPlayer,
     penaltyPoints,
     scoreByRow,
     scoresByLockColor,
     setPenalties,
+    standings,
     toggleExternalClose,
     total,
     uncross,
@@ -53,6 +55,24 @@ describe('newGame', () => {
     it('creates one player for solo and two for duo', () => {
         expect(newGame('classic', 'solo').players).toHaveLength(1);
         expect(newGame('classic', 'duo').players).toHaveLength(2);
+    });
+
+    it('takes an explicit roster size for multiplayer', () => {
+        expect(newGame('classic', 'multi', 5).players).toHaveLength(5);
+        // A room always has at least the host in it.
+        expect(newGame('classic', 'multi', 0).players).toHaveLength(1);
+    });
+
+    it('hands out independent blank slices', () => {
+        const state = newGame('classic', 'multi', 3);
+
+        state.players[0].rows[0].crosses.push(4);
+
+        expect(state.players[1].rows[0].crosses).toEqual([]);
+        expect(newPlayer()).toEqual({
+            rows: [0, 1, 2, 3].map(() => ({ crosses: [], locked: false, closed: false })),
+            penalties: 0,
+        });
     });
 });
 
@@ -318,5 +338,127 @@ describe('scoring', () => {
         expect(scoreByRow(mixedColors, state.players[0])).toEqual([SCORE_TABLE[7], 0, 0, 0]);
         expect(scoresByLockColor(mixedColors, state.players[0]).red).toBe(28);
         expect(total(mixedColors, state.players[0])).toBe(28);
+    });
+});
+
+/*
+ * Multiplayer is not a second rules engine: a room is an N-player state whose
+ * extra slices arrive from the server, so the same functions have to hold at
+ * a table of five that they hold across a shared iPad.
+ */
+describe('multiplayer rooms', () => {
+    it('closes a locked row for every other player in the room', () => {
+        let state = newGame('classic', 'multi', 4);
+        state = crossAll(state, 2, 1, [0, 1, 2, 3, 4, 10]); // player 2 locks yellow
+
+        for (const player of [0, 1, 3]) {
+            expect(isRowClosedFor(state, player, 1)).toBe(true);
+            expect(canCross(state, player, 1, 5)).toBe(false);
+            expect(marksByRow(classic, state.players[player])[1]).toBe(0);
+        }
+
+        expect(lockedRowCount(state)).toBe(1);
+        expect(isGameOver(state)).toBe(false);
+    });
+
+    it('honours the simultaneous-lock exception for every player holding five crosses', () => {
+        let state = newGame('classic', 'multi', 3);
+        state = crossAll(state, 1, 0, [1, 2, 3, 4, 5]); // ready to lock
+        state = crossAll(state, 2, 0, [0, 1, 2]); // not ready
+        state = crossAll(state, 0, 0, [0, 1, 2, 3, 4, 10]); // someone else locks red first
+
+        expect(canCross(state, 1, 0, 10)).toBe(true);
+        expect(canCross(state, 2, 0, 10)).toBe(false);
+
+        state = cross(state, 1, 0, 10);
+
+        expect(marksByRow(classic, state.players[1])[0]).toBe(7);
+        expect(lockedRowCount(state)).toBe(1); // one row, two players locked it
+    });
+
+    it('ends the game when any player in the room takes a fourth penalty', () => {
+        const state = setPenalties(newGame('classic', 'multi', 6), 4, 4);
+
+        expect(isGameOver(state)).toBe(true);
+        expect(canCross(state, 0, 0, 0)).toBe(false);
+    });
+
+    it('ends the game on two rows locked by different players', () => {
+        let state = newGame('classic', 'multi', 4);
+        state = crossAll(state, 0, 0, [0, 1, 2, 3, 4, 10]);
+        state = crossAll(state, 3, 2, [0, 1, 2, 3, 4, 10]);
+
+        expect(lockedRowCount(state)).toBe(2);
+        expect(isGameOver(state)).toBe(true);
+    });
+
+    it('marks a row locked on paper per sheet, exactly as a 2-player game does', () => {
+        let state = newGame('classic', 'multi', 3);
+        state = toggleExternalClose(state, 1, 3);
+
+        // The button records it on the sheet it belongs to — every player
+        // taps their own, just as both players do on a shared iPad.
+        expect(isRowClosedFor(state, 1, 3)).toBe(true);
+        expect(isRowClosedFor(state, 0, 3)).toBe(false);
+
+        // The row still counts as locked for the table, so two of them end
+        // the game for everyone.
+        expect(lockedRowCount(state)).toBe(1);
+        expect(isGameOver(toggleExternalClose(state, 2, 0))).toBe(true);
+    });
+});
+
+describe('standings', () => {
+    const room = (...totals) => {
+        // Build a state whose players score exactly the given totals, using
+        // penalties (-5 each) and red crosses (the triangular table).
+        let state = newGame('classic', 'multi', totals.length);
+
+        totals.forEach((score, player) => {
+            const marks = SCORE_TABLE.indexOf(score);
+
+            state = crossAll(
+                state,
+                player,
+                0,
+                Array.from({ length: marks }, (_, i) => i),
+            );
+        });
+
+        return state;
+    };
+
+    it('orders players best first and names the winner', () => {
+        const table = standings(classic, room(6, 21, 1), ['Ada', 'Bo', 'Cy']);
+
+        expect(table.map((p) => p.name)).toEqual(['Bo', 'Ada', 'Cy']);
+        expect(table.map((p) => p.total)).toEqual([21, 6, 1]);
+        expect(table.map((p) => p.rank)).toEqual([1, 2, 3]);
+        expect(table.filter((p) => p.winner).map((p) => p.name)).toEqual(['Bo']);
+        // The index points back at the seat, whatever the sort did.
+        expect(table[0].index).toBe(1);
+    });
+
+    it('shares the top spot on a tie — Qwixx has no tie-break', () => {
+        const table = standings(classic, room(10, 3, 10), ['Ada', 'Bo', 'Cy']);
+
+        expect(table.filter((p) => p.winner).map((p) => p.name)).toEqual(['Ada', 'Cy']);
+        expect(table.map((p) => p.rank)).toEqual([1, 1, 3]);
+    });
+
+    it('falls back to seat numbers when a name is missing', () => {
+        expect(standings(classic, room(0, 0), ['Ada']).map((p) => p.name)).toEqual(['Ada', 'Player 2']);
+    });
+
+    it('counts penalties against the total', () => {
+        const state = setPenalties(room(10, 10), 0, 2);
+
+        expect(standings(classic, state).map((p) => p.total)).toEqual([10, 0]);
+    });
+
+    it('handles a solo game', () => {
+        const table = standings(classic, newGame('classic', 'solo'), ['Ada']);
+
+        expect(table).toEqual([{ index: 0, name: 'Ada', total: 0, rank: 1, winner: true }]);
     });
 });

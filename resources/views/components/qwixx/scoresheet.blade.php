@@ -1,5 +1,12 @@
-{{-- A full player scoresheet: 4 rows, points legend, penalties, totals. --}}
-@props(['layout', 'playerIndex' => 0, 'compact' => false])
+{{--
+    A full player scoresheet: 4 rows, points legend, penalties, totals.
+
+    `playerIndex` is interpolated straight into the Alpine expressions below,
+    so it takes a literal index (0, 1) for a local game or the name of a
+    reactive property ("me") for a multiplayer one, where this device's seat
+    depends on the order people joined.
+--}}
+@props(['layout', 'playerIndex' => 0, 'compact' => false, 'mode' => 'solo'])
 
 @php($p = $playerIndex)
 
@@ -9,10 +16,29 @@
         'qx-compact' => $compact,
     ]) }}
 >
-    <div class="flex items-end justify-between px-1">
+    <div class="flex items-end justify-between gap-2 px-1">
         <span class="text-[calc(var(--qx-cell)*0.32)] font-black tracking-tight">
             QWI<span class="text-qwixx-red">X</span><span class="text-qwixx-blue">X</span>
         </span>
+
+        {{-- Whose sheet this is. Editable in a 2-player game, where both
+             sheets share a device; in a room the name came from joining. --}}
+        @if ($mode === 'duo')
+            <input
+                type="text"
+                maxlength="14"
+                class="min-w-0 flex-1 truncate rounded-md bg-transparent px-1 text-center text-[calc(var(--qx-cell)*0.26)] font-bold text-zinc-500 hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:focus:bg-zinc-800"
+                aria-label="Player name"
+                x-bind:value="playerName({{ $p }})"
+                x-on:change="setName({{ $p }}, $event.target.value)"
+            />
+        @elseif ($mode === 'multi')
+            <span
+                class="min-w-0 flex-1 truncate text-center text-[calc(var(--qx-cell)*0.26)] font-bold text-zinc-500 dark:text-zinc-400"
+                x-text="playerName({{ $p }})"
+            ></span>
+        @endif
+
         <span class="text-[calc(var(--qx-cell)*0.22)] font-semibold text-zinc-400">At least 5 ✕'s to lock</span>
     </div>
 
@@ -47,13 +73,26 @@
         <div class="pointer-events-auto flex items-center justify-between gap-4 rounded-xl bg-zinc-900/95 px-5 py-3 text-white shadow-2xl ring-1 ring-white/20 dark:bg-zinc-100/95 dark:text-zinc-900">
             <div>
                 <div class="text-[calc(var(--qx-cell)*0.34)] font-black">Game over!</div>
-                <div class="text-[calc(var(--qx-cell)*0.24)] font-medium opacity-80">
-                    <span x-text="gameOverReason"></span>
-                    Final score: <span class="font-black" x-text="totalFor({{ $p }})"></span>
-                </div>
+
+                @if ($mode === 'solo')
+                    <div class="text-[calc(var(--qx-cell)*0.24)] font-medium opacity-80">
+                        <span x-text="gameOverReason"></span>
+                        Final score: <span class="font-black" x-text="totalFor({{ $p }})"></span>
+                    </div>
+                @else
+                    <x-qwixx.results />
+                @endif
             </div>
+
+            {{-- In a room only the host deals the next game, so everyone's
+                 sheets clear at the same moment. The condition is baked into
+                 the x-show expression rather than wrapped around the tag:
+                 Blade directives can't live inside a component tag's
+                 attribute list. --}}
             <flux:modal.trigger name="reset-confirm">
-                <flux:button size="sm" variant="primary">New game</flux:button>
+                <flux:button size="sm" variant="primary" x-show="{{ $mode === 'multi' ? 'isHost' : 'true' }}" x-cloak>
+                    New game
+                </flux:button>
             </flux:modal.trigger>
         </div>
     </div>

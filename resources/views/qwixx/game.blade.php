@@ -45,14 +45,14 @@
                 </div>
 
                 <div class="flex min-h-0 flex-1 items-center justify-center p-3">
-                    <x-qwixx.scoresheet :layout="$layout" :player-index="0" />
+                    <x-qwixx.scoresheet :layout="$layout" :player-index="0" :mode="$mode" />
                 </div>
             </div>
         @else
             {{-- Duo: two sheets facing away from each other, iPad flat on the table. --}}
             <div class="grid h-full grid-rows-[1fr_auto_1fr]">
                 <div class="flex min-h-0 rotate-180 items-center justify-center p-2">
-                    <x-qwixx.scoresheet :layout="$layout" :player-index="1" compact />
+                    <x-qwixx.scoresheet :layout="$layout" :player-index="1" :mode="$mode" compact />
                 </div>
 
                 <div class="flex items-center justify-center gap-2 border-y border-zinc-200 bg-white/60 px-4 py-1.5 dark:border-zinc-800 dark:bg-zinc-900/60">
@@ -76,7 +76,7 @@
                 </div>
 
                 <div class="flex min-h-0 items-center justify-center p-2">
-                    <x-qwixx.scoresheet :layout="$layout" :player-index="0" compact />
+                    <x-qwixx.scoresheet :layout="$layout" :player-index="0" :mode="$mode" compact />
                 </div>
             </div>
         @endif
