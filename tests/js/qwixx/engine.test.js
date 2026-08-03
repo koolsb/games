@@ -462,3 +462,65 @@ describe('standings', () => {
         expect(table).toEqual([{ index: 0, name: 'Ada', total: 0, rank: 1, winner: true }]);
     });
 });
+
+/*
+ * A game can end on a mistap — the fourth penalty box, or the lock cell of
+ * a row someone was not finished with. Taking that mark back has to put the
+ * table back exactly where it was, in every mode.
+ */
+describe('taking back the mark that ended the game', () => {
+    it('reopens play when the fourth penalty is undone', () => {
+        let state = setPenalties(newGame('classic', 'duo'), 1, 4);
+
+        expect(isGameOver(state)).toBe(true);
+
+        state = setPenalties(state, 1, 3);
+
+        expect(isGameOver(state)).toBe(false);
+        expect(canCross(state, 0, 0, 0)).toBe(true);
+        expect(canCross(state, 1, 0, 0)).toBe(true);
+        expect(penaltyPoints(state.players[1])).toBe(15);
+    });
+
+    it('reopens play when the second lock is uncrossed', () => {
+        let state = newGame('classic', 'duo');
+        state = crossAll(state, 0, 0, [0, 1, 2, 3, 4, 10]);
+        state = crossAll(state, 1, 1, [0, 1, 2, 3, 4, 10]);
+
+        expect(isGameOver(state)).toBe(true);
+
+        state = uncross(state, 1, 1, 10);
+
+        expect(isGameOver(state)).toBe(false);
+        expect(lockedRowCount(state)).toBe(1);
+        // The row the mistake closed is open again for everyone.
+        expect(isRowClosedFor(state, 0, 1)).toBe(false);
+        expect(canCross(state, 0, 1, 5)).toBe(true);
+        // The first lock still stands, marks and all.
+        expect(marksByRow(classic, state.players[0])[0]).toBe(7);
+    });
+
+    it('reopens a room of five when one player takes their lock back', () => {
+        let state = newGame('classic', 'multi', 5);
+        state = crossAll(state, 2, 0, [0, 1, 2, 3, 4, 10]);
+        state = crossAll(state, 4, 3, [0, 1, 2, 3, 4, 10]);
+
+        expect(isGameOver(state)).toBe(true);
+
+        // Player 4 mistapped: everyone's game resumes once it is undone.
+        state = uncross(state, 4, 3, 10);
+
+        expect(isGameOver(state)).toBe(false);
+
+        for (let player = 0; player < 5; player++) {
+            expect(isRowClosedFor(state, player, 3)).toBe(false);
+        }
+    });
+
+    it('leaves an undone penalty out of the score', () => {
+        let state = setPenalties(newGame('classic', 'duo'), 0, 4);
+        state = setPenalties(state, 0, 3);
+
+        expect(total(classic, state.players[0])).toBe(-15);
+    });
+});

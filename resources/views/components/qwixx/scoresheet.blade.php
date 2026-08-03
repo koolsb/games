@@ -84,16 +84,25 @@
                 @endif
             </div>
 
-            {{-- In a room only the host deals the next game, so everyone's
-                 sheets clear at the same moment. The condition is baked into
-                 the x-show expression rather than wrapped around the tag:
-                 Blade directives can't live inside a component tag's
-                 attribute list. --}}
-            <flux:modal.trigger name="reset-confirm">
-                <flux:button size="sm" variant="primary" x-show="{{ $mode === 'multi' ? 'isHost' : 'true' }}" x-cloak>
-                    New game
+            <div class="flex shrink-0 items-center gap-2">
+                {{-- A game can end on a mistap — the fourth penalty, or a
+                     lock nobody meant to take. The banner covers the cells
+                     you would tap to undo it, so it offers the undo itself. --}}
+                <flux:button size="sm" variant="filled" x-show="undo" x-cloak x-on:click="undoLast()">
+                    Undo last <span x-text="undo?.label"></span>
                 </flux:button>
-            </flux:modal.trigger>
+
+                {{-- In a room only the host deals the next game, so everyone's
+                     sheets clear at the same moment. The condition is baked into
+                     the x-show expression rather than wrapped around the tag:
+                     Blade directives can't live inside a component tag's
+                     attribute list. --}}
+                <flux:modal.trigger name="reset-confirm">
+                    <flux:button size="sm" variant="primary" x-show="{{ $mode === 'multi' ? 'isHost' : 'true' }}" x-cloak>
+                        New game
+                    </flux:button>
+                </flux:modal.trigger>
+            </div>
         </div>
     </div>
 </div>

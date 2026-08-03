@@ -63,6 +63,11 @@ document.addEventListener('alpine:init', () => {
         state: null,
         names: [],
 
+        // The sheet as it was before the last change on this device, so a
+        // mistaken tap can be taken back — including the one that ended the
+        // game. One step deep: it exists to fix a slip, not to rewind a game.
+        undo: null,
+
         // -- multiplayer ---------------------------------------------------
         multi: mode === 'multi',
         room: roomSnapshot,
@@ -163,27 +168,38 @@ document.addEventListener('alpine:init', () => {
 
         // -- gameplay ----------------------------------------------------
 
+        /*
+         * Every change goes through here so the sheet before it survives as
+         * a one-step undo. The engine returns the state it was handed when
+         * a move is illegal, which is how we tell a real change from a tap
+         * on a closed cell — an illegal tap must not become the thing an
+         * undo takes back.
+         */
+        mutate(label, apply) {
+            const before = JSON.parse(JSON.stringify(this.state.players));
+            const next = apply();
+
+            if (next === this.state) return;
+
+            this.state = next;
+            this.undo = { label, players: before };
+            this.commit();
+        },
+
         tap(player, row, pos) {
             const rowSt = this.state.players[player].rows[row];
 
             if (rowSt.crosses.includes(pos)) {
-                if (engine.canUncross(this.state, player, row, pos)) {
-                    this.state = engine.uncross(this.state, player, row, pos);
-                    this.commit();
-                }
+                this.mutate('mark', () => engine.uncross(this.state, player, row, pos));
 
                 return;
             }
 
-            if (engine.canCross(this.state, player, row, pos)) {
-                this.state = engine.cross(this.state, player, row, pos);
-                this.commit();
-            }
+            this.mutate('mark', () => engine.cross(this.state, player, row, pos));
         },
 
         setPenalty(player, count) {
-            this.state = engine.setPenalties(this.state, player, count);
-            this.commit();
+            this.mutate('penalty', () => engine.setPenalties(this.state, player, count));
         },
 
         togglePenalty(player, index) {
@@ -193,7 +209,33 @@ document.addEventListener('alpine:init', () => {
         },
 
         toggleClose(player, row) {
-            this.state = engine.toggleExternalClose(this.state, player, row);
+            this.mutate('lock', () => engine.toggleExternalClose(this.state, player, row));
+        },
+
+        /*
+         * Take back the last change made on this device. The game-over
+         * banner sits over the very cells you would otherwise tap to undo a
+         * mistaken fourth penalty or a lock nobody meant to take, so the
+         * banner offers this directly.
+         *
+         * In a room this device only owns its own sheet, so that is all it
+         * restores — if someone else ended the game by accident, the undo
+         * belongs on their device, and their next sync reopens the game for
+         * everyone.
+         */
+        undoLast() {
+            if (!this.undo) return;
+
+            const { players } = this.undo;
+
+            this.state = {
+                ...this.state,
+                players: this.state.players.map((player, index) =>
+                    !this.multi || index === this.me ? players[index] : player,
+                ),
+            };
+
+            this.undo = null;
             this.commit();
         },
 
@@ -212,6 +254,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.state = engine.newGame(layout.id, mode);
+            this.undo = null;
             this.save();
         },
 
@@ -286,10 +329,15 @@ document.addEventListener('alpine:init', () => {
             return engine.standings(layout, this.state, this.names);
         },
 
+        /*
+         * Derived from the sheets themselves, never from the room's status.
+         * A device that reloads after the last lock still lands on the
+         * results, because it holds everyone's sheets — and when a player
+         * takes back the mark that ended the game, the table goes straight
+         * back to playing instead of being stuck behind a server flag.
+         */
         get gameOver() {
-            // The server's verdict is sticky: a device that reloads after the
-            // last lock still lands on the results rather than a live sheet.
-            return engine.isGameOver(this.state) || this.room?.status === 'ended';
+            return engine.isGameOver(this.state);
         },
 
         get gameOverReason() {
@@ -464,6 +512,9 @@ document.addEventListener('alpine:init', () => {
 
             this.round = snapshot.round;
 
+            // Nothing from the last game is worth taking back into this one.
+            if (restarted) this.undo = null;
+
             const mine = restarted ? engine.newPlayer() : (index >= 0 ? this.state?.players[this.me] : null);
 
             this.me = index;
@@ -515,7 +566,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         playerStale(player) {
-            return room.isStale(player);
+            return room.isStale(player, this.roster);
         },
 
         // -- wake lock -----------------------------------------------------

@@ -106,26 +106,40 @@ final class RoomController extends Controller
      */
     public function sync(Request $request, string $code): JsonResponse
     {
+        /*
+         * `present`, not `required`, on the per-row fields: every sheet
+         * starts with no crosses at all, and `required` rejects an empty
+         * array. Requiring them there rejected the exact payload a new game
+         * sends on its very first sync, which silently broke every room.
+         */
         $data = $request->validate([
             'state' => ['nullable', 'array'],
             'state.penalties' => ['required_with:state', 'integer', 'between:0,4'],
             'state.rows' => ['required_with:state', 'array', 'size:4'],
-            'state.rows.*.crosses' => ['required', 'array', 'max:11'],
+            'state.rows.*.crosses' => ['present', 'array', 'max:11'],
             'state.rows.*.crosses.*' => ['integer', 'between:0,10'],
-            'state.rows.*.locked' => ['required', 'boolean'],
-            'state.rows.*.closed' => ['required', 'boolean'],
+            'state.rows.*.locked' => ['present', 'boolean'],
+            'state.rows.*.closed' => ['present', 'boolean'],
             'ended' => ['nullable', 'boolean'],
         ]);
 
         return $this->asPlayer($request, $code, function (Room $room, RoomPlayer $player) use ($data): Room {
             $next = array_key_exists('state', $data) && is_array($data['state'])
-                ? $room->replace($player->withState($data['state']))
+                ? $room->replace($player->withState($this->sheet($data['state'])))
                 : $room->replace($player->seen());
 
             // The first browser to notice the game is over says so, and the
             // room stays ended for everyone — including anyone who reloads.
-            if (($data['ended'] ?? false) && $next->status !== Room::ENDED) {
-                $next = $next->with(status: Room::ENDED, endedAt: time());
+            // A browser that no longer sees a finished game says that too,
+            // which is how taking back an accidental last mark reopens the
+            // room. Each browser derives the verdict from the same sheets,
+            // so they converge within a poll of each other.
+            if (array_key_exists('ended', $data) && $data['ended'] !== null) {
+                if ($data['ended'] && $next->status === Room::PLAYING) {
+                    $next = $next->with(status: Room::ENDED, endedAt: time());
+                } elseif (! $data['ended'] && $next->status === Room::ENDED) {
+                    $next = $next->reopened();
+                }
             }
 
             return $next;
@@ -213,6 +227,28 @@ final class RoomController extends Controller
     private function error(string $message, string $reason, int $status): JsonResponse
     {
         return response()->json(['message' => $message, 'reason' => $reason], $status);
+    }
+
+    /**
+     * Rebuild the slice in exactly the shape the browser engine expects,
+     * from the validated input. Every other device reads this back and
+     * feeds it straight to the rules engine, so a row that arrived without
+     * its `crosses` key would break their sheet, not ours. Rebuilding also
+     * keeps anything we did not ask for out of the cache.
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function sheet(array $state): array
+    {
+        return [
+            'penalties' => (int) ($state['penalties'] ?? 0),
+            'rows' => array_values(array_map(fn (array $row): array => [
+                'crosses' => array_values(array_map(intval(...), $row['crosses'] ?? [])),
+                'locked' => (bool) ($row['locked'] ?? false),
+                'closed' => (bool) ($row['closed'] ?? false),
+            ], $state['rows'] ?? [])),
+        ];
     }
 
     /**

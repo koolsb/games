@@ -46,6 +46,10 @@ exactly as it was.
   with 5+ crosses can still take the final cell of a freshly locked row.
 - **Game over** banner when two rows are locked or four penalties are taken —
   with the final standings and the winner in 2-player and multiplayer games.
+  It carries an **Undo last mark** button, because a game can end on a mistap
+  and the banner covers the cells you would otherwise tap to take it back. In a
+  room each device undoes its own sheet; the moment that sync lands, the table
+  is playing again — the verdict is derived from the sheets, not latched.
 - **Screen wake lock** on by default (toggleable) so the iPad doesn't sleep
   mid-game, plus a full-screen toggle where the browser supports it.
 - **Reset** with a confirmation dialog.

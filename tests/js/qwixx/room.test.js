@@ -85,11 +85,26 @@ describe('roomNames', () => {
 });
 
 describe('isStale', () => {
-    it('flags a player who has stopped syncing', () => {
-        const now = Date.now();
-        const seconds = (ms) => Math.floor((now - ms) / 1000);
+    const stale = STALE_AFTER_MS / 1000;
 
-        expect(isStale({ lastSeenAt: seconds(2000) }, now)).toBe(false);
-        expect(isStale({ lastSeenAt: seconds(STALE_AFTER_MS + 1000) }, now)).toBe(true);
+    it('flags a player who stopped syncing while the others carried on', () => {
+        const players = [{ lastSeenAt: 1000 }, { lastSeenAt: 1000 - stale - 5 }];
+
+        expect(isStale(players[0], players)).toBe(false);
+        expect(isStale(players[1], players)).toBe(true);
+    });
+
+    it('measures against the room rather than this device clock', () => {
+        // Every timestamp here is the server's. A phone whose clock is an
+        // hour out must not paint the whole table as disconnected.
+        const players = [{ lastSeenAt: 9_000_000 }, { lastSeenAt: 9_000_000 - 2 }];
+
+        expect(players.some((player) => isStale(player, players))).toBe(false);
+    });
+
+    it('leaves a lone host alone', () => {
+        const players = [{ lastSeenAt: 42 }];
+
+        expect(isStale(players[0], players)).toBe(false);
     });
 });
