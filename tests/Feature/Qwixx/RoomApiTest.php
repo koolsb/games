@@ -28,11 +28,16 @@ function joinRoom(string $code, string $name): string
     return $response->json('token');
 }
 
-/** A valid player slice: three crosses in the red row. */
-function playerSheet(int $penalties = 0): array
+/**
+ * A player slice exactly as the browser sends it — blank by default,
+ * because that is what every game syncs before anyone has crossed
+ * anything, and a fixture that always had marks in it is what let an
+ * empty-row bug through.
+ */
+function playerSheet(int $penalties = 0, array $crosses = []): array
 {
     return [
-        'rows' => array_fill(0, 4, ['crosses' => [0, 1, 2], 'locked' => false, 'closed' => false]),
+        'rows' => array_fill(0, 4, ['crosses' => $crosses, 'locked' => false, 'closed' => false]),
         'penalties' => $penalties,
     ];
 }
@@ -260,4 +265,83 @@ it('trims a name to something a scoreboard can hold', function () {
     $this->postJson('/qwixx/rooms', ['layout' => 'classic', 'name' => "A\u{0000}da"])
         ->assertCreated()
         ->assertJsonPath('room.players.0.name', 'Ada');
+});
+
+/*
+| The bug that broke every real game: a fresh sheet has no crosses in it,
+| and `required` treats an empty array as missing, so the very first sync
+| of every room was rejected. Nothing else in the flow works after that —
+| the host never sees anyone join and nobody ever sees the game start.
+*/
+it('accepts the blank sheet a new game syncs before anyone has crossed anything', function () {
+    [$code, $host] = hostRoom();
+
+    $this->withHeader('X-Qwixx-Token', $host)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(), 'ended' => false])
+        ->assertOk()
+        ->assertJsonPath('room.players.0.state.penalties', 0)
+        ->assertJsonPath('room.players.0.state.rows.0.crosses', [])
+        ->assertJsonPath('room.players.0.state.rows.3.locked', false);
+});
+
+it('still stores a sheet that has marks on it', function () {
+    [$code, $host] = hostRoom();
+
+    $marked = playerSheet(1, [0, 1, 2]);
+    $marked['rows'][2]['locked'] = true;
+    $marked['rows'][3]['closed'] = true;
+
+    $this->withHeader('X-Qwixx-Token', $host)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => $marked])
+        ->assertOk()
+        ->assertJsonPath('room.players.0.state.rows.0.crosses', [0, 1, 2])
+        ->assertJsonPath('room.players.0.state.rows.2.locked', true)
+        ->assertJsonPath('room.players.0.state.rows.3.closed', true)
+        ->assertJsonPath('room.players.0.state.penalties', 1);
+});
+
+/*
+| The whole lobby handshake as two browsers actually perform it: everyone
+| polls with their own blank sheet, so a poll that 422s strands the room.
+*/
+it('carries a lobby through to a started game the way two browsers do', function () {
+    [$code, $host] = hostRoom('Ada');
+    $guest = joinRoom($code, 'Bo');
+
+    // The host's poll — the one that was failing — shows the guest arriving.
+    $this->withHeader('X-Qwixx-Token', $host)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet()])
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::LOBBY)
+        ->assertJsonCount(2, 'room.players')
+        ->assertJsonPath('room.players.1.name', 'Bo');
+
+    // The guest polls too, and is still waiting.
+    $this->withHeader('X-Qwixx-Token', $guest)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet()])
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::LOBBY);
+
+    $this->withHeader('X-Qwixx-Token', $host)->postJson("/qwixx/rooms/$code/start")->assertOk();
+
+    // And the guest's next poll is what starts their game.
+    $this->withHeader('X-Qwixx-Token', $guest)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet()])
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::PLAYING);
+});
+
+it('keeps every player syncing across a whole table of blank sheets', function () {
+    [$code, $host] = hostRoom('Ada');
+
+    $guests = collect(['Bo', 'Cy', 'Di'])->map(fn (string $name): string => joinRoom($code, $name));
+
+    $this->withHeader('X-Qwixx-Token', $host)->postJson("/qwixx/rooms/$code/start")->assertOk();
+
+    foreach ($guests->push($host) as $token) {
+        $this->withHeader('X-Qwixx-Token', $token)
+            ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet()])
+            ->assertOk()
+            ->assertJsonCount(4, 'room.players');
+    }
 });

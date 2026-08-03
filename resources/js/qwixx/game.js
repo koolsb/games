@@ -515,7 +515,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         playerStale(player) {
-            return room.isStale(player);
+            return room.isStale(player, this.roster);
         },
 
         // -- wake lock -----------------------------------------------------

@@ -115,8 +115,16 @@ export function roomNames(room) {
     return room.players.map((player) => player.name);
 }
 
-export function isStale(player, now = Date.now()) {
-    return now - player.lastSeenAt * 1000 > STALE_AFTER_MS;
+/*
+ * Has this player stopped talking to the room? Measured against the most
+ * recent sync in the roster rather than this device's clock: every
+ * timestamp here is the server's, so a phone with a wrong clock would
+ * otherwise paint the whole table as disconnected.
+ */
+export function isStale(player, players) {
+    const latest = players.reduce((newest, other) => Math.max(newest, other.lastSeenAt), 0);
+
+    return latest - player.lastSeenAt > STALE_AFTER_MS / 1000;
 }
 
 // -- this device's seats -------------------------------------------------
