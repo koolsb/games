@@ -130,8 +130,16 @@ final class RoomController extends Controller
 
             // The first browser to notice the game is over says so, and the
             // room stays ended for everyone — including anyone who reloads.
-            if (($data['ended'] ?? false) && $next->status !== Room::ENDED) {
-                $next = $next->with(status: Room::ENDED, endedAt: time());
+            // A browser that no longer sees a finished game says that too,
+            // which is how taking back an accidental last mark reopens the
+            // room. Each browser derives the verdict from the same sheets,
+            // so they converge within a poll of each other.
+            if (array_key_exists('ended', $data) && $data['ended'] !== null) {
+                if ($data['ended'] && $next->status === Room::PLAYING) {
+                    $next = $next->with(status: Room::ENDED, endedAt: time());
+                } elseif (! $data['ended'] && $next->status === Room::ENDED) {
+                    $next = $next->reopened();
+                }
             }
 
             return $next;

@@ -345,3 +345,75 @@ it('keeps every player syncing across a whole table of blank sheets', function (
             ->assertJsonCount(4, 'room.players');
     }
 });
+
+/*
+| A game that ended on a mistap has to be recoverable. Each browser derives
+| the verdict from the sheets, so the one that takes the mark back stops
+| reporting a finished game — and that reopens the room for everyone.
+*/
+it('reopens an ended room when a browser stops seeing a finished game', function () {
+    [$code, $host] = hostRoom();
+    $guest = joinRoom($code, 'Bo');
+
+    $this->withHeader('X-Qwixx-Token', $host)->postJson("/qwixx/rooms/$code/start")->assertOk();
+
+    $this->withHeader('X-Qwixx-Token', $guest)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(), 'ended' => true])
+        ->assertJsonPath('room.status', Room::ENDED);
+
+    // The guest undoes the accidental mark; their next sync withdraws it.
+    $this->withHeader('X-Qwixx-Token', $guest)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(), 'ended' => false])
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::PLAYING)
+        ->assertJsonPath('room.endedAt', null);
+
+    // Everyone else picks it up on their next poll, sheets untouched.
+    $this->withHeader('X-Qwixx-Token', $host)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(), 'ended' => false])
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::PLAYING)
+        ->assertJsonCount(2, 'room.players');
+
+    // The round did not move: this is the same game, carrying on.
+    expect(app(RoomStore::class)->find($code)->round)->toBe(1);
+});
+
+it('keeps sheets and seats intact across an end and a reopen', function () {
+    [$code, $host] = hostRoom('Ada');
+    $guest = joinRoom($code, 'Bo');
+
+    $this->withHeader('X-Qwixx-Token', $host)->postJson("/qwixx/rooms/$code/start");
+    $this->withHeader('X-Qwixx-Token', $guest)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(2, [0, 1, 2]), 'ended' => true]);
+
+    $this->withHeader('X-Qwixx-Token', $guest)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(2, [0, 1]), 'ended' => false])
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::PLAYING)
+        ->assertJsonPath('room.players.1.name', 'Bo')
+        ->assertJsonPath('room.players.1.state.rows.0.crosses', [0, 1])
+        ->assertJsonPath('room.players.1.state.penalties', 2);
+
+    // And the guest's token still works, so nobody has to rejoin.
+    $this->withHeader('X-Qwixx-Token', $guest)->postJson("/qwixx/rooms/$code/sync")->assertOk();
+});
+
+it('does not end a game that never started, and a bare poll changes nothing', function () {
+    [$code, $host] = hostRoom();
+
+    // A lobby cannot be ended by a stray report.
+    $this->withHeader('X-Qwixx-Token', $host)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(), 'ended' => true])
+        ->assertJsonPath('room.status', Room::LOBBY);
+
+    $this->withHeader('X-Qwixx-Token', $host)->postJson("/qwixx/rooms/$code/start");
+    $this->withHeader('X-Qwixx-Token', $host)
+        ->postJson("/qwixx/rooms/$code/sync", ['state' => playerSheet(), 'ended' => true])
+        ->assertJsonPath('room.status', Room::ENDED);
+
+    // A poll that says nothing about the verdict must not withdraw it.
+    $this->withHeader('X-Qwixx-Token', $host)->postJson("/qwixx/rooms/$code/sync")
+        ->assertOk()
+        ->assertJsonPath('room.status', Room::ENDED);
+});

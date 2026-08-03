@@ -73,6 +73,26 @@ final readonly class Room
     }
 
     /**
+     * The last mark turned out to be a mistake. Every sheet stays exactly
+     * as it is — only the room's verdict is withdrawn, so play carries on
+     * from where it was.
+     */
+    public function reopened(): self
+    {
+        return new self(
+            code: $this->code,
+            layoutId: $this->layoutId,
+            status: self::PLAYING,
+            players: $this->players,
+            version: $this->version + 1,
+            round: $this->round,
+            createdAt: $this->createdAt,
+            updatedAt: time(),
+            endedAt: null,
+        );
+    }
+
+    /**
      * Another game with the same people: every sheet is wiped and `round`
      * bumps, which is how each browser knows to clear its own copy.
      */
