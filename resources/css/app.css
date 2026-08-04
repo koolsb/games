@@ -114,6 +114,48 @@
 }
 
 /*
+| Phase 10 progress pips: one small badge per phase, crossed out as a
+| player clears it. The ✕ is drawn the same way Qwixx crosses a cell, so
+| "done" looks the same in both games — and the phase number stays legible
+| underneath, which a filled-in badge would lose.
+*/
+@layer components {
+    .p10-pip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.6rem;
+        height: 1.6rem;
+        border-radius: 0.45rem;
+        font-size: 0.7rem;
+        font-weight: 800;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .p10-pip-crossed::after {
+        content: '✕';
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        font-weight: 900;
+        color: currentColor;
+    }
+
+    /* The phase the host has just ticked off but not yet saved: the same ✕,
+       held back so an un-tick reads as undoing something provisional. */
+    .p10-pip-pending::after {
+        opacity: 0.5;
+    }
+}
+
+/*
 | Scoresheet cells. Size flows from one custom property so the duo screen
 | can compress both sheets onto a single iPad viewport.
 */

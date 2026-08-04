@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Phase\DifficultyBand;
 use App\Enums\Phase\GenerationMode;
+use App\Livewire\Concerns\WatchesScoreGames;
 use App\Services\Phase\PhaseGeneratorService;
 use App\Services\Phase\PhaseLibrary;
 use App\Support\Phase\GeneratedGame;
@@ -14,6 +15,8 @@ use Livewire\Component;
 
 new class extends Component
 {
+    use WatchesScoreGames;
+
     public int $count = 10;
 
     public string $mode = 'ramp';
@@ -36,8 +39,24 @@ new class extends Component
     /** @var array{0: int, 1: int} Indices into DifficultyBand::ordered() — 0=Easy, 3=Brutal */
     public array $difficultyRange = [0, 3];
 
+    /**
+     * Player names passed through from the scoring setup screen. This page
+     * is a detour on the way to a game, so the names typed there ride along
+     * in the URL and go straight back — otherwise "change the phases" costs
+     * you everyone's name.
+     *
+     * @var list<string>
+     */
+    public array $carriedPlayers = [];
+
     public function mount(PhaseLibrary $library): void
     {
+        $players = request()->query('players');
+
+        if (is_string($players) && $players !== '') {
+            $this->carriedPlayers = array_values(array_filter(array_map('trim', explode(',', $players))));
+        }
+
         $phases = request()->query('phases');
 
         if (is_string($phases) && $phases !== '') {
@@ -131,6 +150,14 @@ new class extends Component
     public function printUrl(): string
     {
         return route('phase10.print', ['phases' => implode(',', $this->signatures)]);
+    }
+
+    public function scoreUrl(): string
+    {
+        return route('phase10.play', array_filter([
+            'phases' => implode(',', $this->signatures),
+            'players' => implode(',', $this->carriedPlayers),
+        ]));
     }
 
     #[Computed]
@@ -261,7 +288,8 @@ new class extends Component
         <flux:heading size="xl" class="font-black">Generate a Phase 10 game</flux:heading>
         <flux:text>
             Build a fresh set of phases to keep the game interesting. Pick how difficulty should flow,
-            how many phases you want, then generate, tweak, and print a card.
+            how many phases you want, then generate and tweak — and when you're happy, print the card
+            or keep score on it right here.
         </flux:text>
         <div class="flex flex-wrap gap-2 pt-1">
             @foreach ($bandOptions as $b)
@@ -271,6 +299,8 @@ new class extends Component
             @endforeach
         </div>
     </div>
+
+    @include('phase10.partials.watch-form')
 
     {{-- Controls --}}
     <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
@@ -339,6 +369,8 @@ new class extends Component
 
         <flux:separator class="my-6" />
 
+        {{-- Building the list. What you do *with* a finished list lives with
+             the results below, so this row only ever holds one job. --}}
         <div class="flex flex-wrap items-center gap-3">
             <flux:button variant="primary" icon="sparkles" wire:click="generate" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="generate">Generate {{ $count }} {{ \Illuminate\Support\Str::plural('phase', $count) }}</span>
@@ -352,15 +384,6 @@ new class extends Component
             </flux:button>
 
             @if ($generated && count($this->phases))
-                <flux:button @click="fullscreen = true" variant="subtle" icon="arrows-pointing-out">
-                    Full screen
-                </flux:button>
-                <flux:button :href="$this->printUrl()" target="_blank" variant="subtle" icon="printer">
-                    Print card
-                </flux:button>
-                <flux:button :href="route('phase10.play', ['phases' => implode(',', $this->signatures)])" variant="subtle" icon="trophy">
-                    Score this game
-                </flux:button>
                 <flux:button variant="ghost" icon="trash" wire:click="clear">Clear</flux:button>
             @endif
 
@@ -372,6 +395,24 @@ new class extends Component
 
     {{-- Results --}}
     @if (count($this->phases))
+        {{-- What to do with the game you just built, in the order people
+             want it: play it, print it, or blow it up on the table. --}}
+        <div class="flex flex-wrap items-center gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
+            <flux:text class="min-w-40 flex-1 text-sm">
+                <span class="font-semibold text-zinc-800 dark:text-zinc-100">{{ count($this->phases) }} phases ready.</span>
+                Keep score on this device and everyone else can follow along.
+            </flux:text>
+            <flux:button :href="$this->scoreUrl()" variant="primary" icon="trophy">
+                Keep score
+            </flux:button>
+            <flux:button :href="$this->printUrl()" target="_blank" variant="subtle" icon="printer">
+                Print card
+            </flux:button>
+            <flux:button @click="fullscreen = true" variant="subtle" icon="arrows-pointing-out">
+                Full screen
+            </flux:button>
+        </div>
+
         @if (count($this->widenedSlots))
             <flux:callout variant="warning" icon="exclamation-triangle">
                 <flux:callout.text>
@@ -411,6 +452,10 @@ new class extends Component
         <div class="rounded-xl border border-dashed border-zinc-300 px-6 py-16 text-center dark:border-zinc-700">
             <flux:icon name="sparkles" class="mx-auto mb-3 size-8 text-zinc-300" />
             <flux:text>No phases yet — hit <span class="font-semibold">Generate</span> to build a game.</flux:text>
+            <flux:text class="mt-4 text-sm">
+                Playing the phases off the real card?
+                <a href="{{ route('phase10.play') }}" class="font-semibold text-accent-content underline">Just keep score</a>.
+            </flux:text>
         </div>
     @endif
 

@@ -20,15 +20,16 @@
                 <span class="hidden text-sm font-bold text-zinc-500 sm:inline dark:text-zinc-400">
                     {{ $layout->name }}
                 </span>
-                <button
-                    type="button"
-                    class="rounded-lg bg-zinc-200/70 px-2 py-0.5 font-mono text-sm font-black tracking-[0.3em] text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                    x-on:click="copyCode()"
-                    title="Copy the link to this game"
-                >{{ $room->code }}</button>
-                <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400" x-show="copied" x-cloak>
-                    Link copied
-                </span>
+                <flux:modal.trigger name="share-game">
+                    <button
+                        type="button"
+                        class="flex items-center gap-1.5 rounded-lg bg-zinc-200/70 px-2.5 py-0.5 font-mono text-sm font-black tracking-[0.3em] text-zinc-700 transition hover:bg-zinc-300/70 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                        title="Share this game"
+                    >
+                        {{ $room->code }}
+                        <flux:icon.share class="size-3.5 shrink-0 tracking-normal text-zinc-400" />
+                    </button>
+                </flux:modal.trigger>
             </div>
 
             <div class="flex items-center gap-1">
@@ -129,16 +130,22 @@
                 <div class="w-full max-w-md space-y-6 text-center">
                     <div class="space-y-2">
                         <flux:text class="text-sm font-semibold uppercase tracking-wide">Game code</flux:text>
-                        <button
-                            type="button"
-                            class="w-full rounded-2xl bg-white py-4 font-mono text-5xl font-black tracking-[0.35em] text-zinc-800 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-zinc-800"
-                            x-on:click="copyCode()"
-                        >{{ $room->code }}</button>
+                        <flux:modal.trigger name="share-game">
+                            <button
+                                type="button"
+                                class="w-full rounded-2xl bg-white py-4 font-mono text-5xl font-black tracking-[0.35em] text-zinc-800 shadow-sm ring-1 ring-zinc-200 transition hover:ring-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-zinc-800 dark:hover:ring-zinc-700"
+                            >{{ $room->code }}</button>
+                        </flux:modal.trigger>
                         <flux:text class="text-sm">
-                            Everyone opens <span class="font-semibold">games.kools.us/qwixx</span>, taps
-                            <span class="font-semibold">Join a game</span> and types this code. Tap the code to copy
-                            a link instead.
+                            Everyone opens <span class="font-semibold">{{ parse_url(config('app.url'), PHP_URL_HOST) }}/qwixx</span>,
+                            taps <span class="font-semibold">Join a game</span> and types this code.
                         </flux:text>
+                        {{-- Reading the code out only works for the people in the
+                             room. Sending the link is the other half, so it gets a
+                             button of its own rather than a hint about tapping. --}}
+                        <flux:modal.trigger name="share-game">
+                            <flux:button variant="subtle" size="sm" icon="share">Send a link instead</flux:button>
+                        </flux:modal.trigger>
                     </div>
 
                     <div class="space-y-2">
@@ -185,6 +192,44 @@
                 </div>
             </div>
         </template>
+
+        {{--
+            Sharing the game. Same shape as the Phase 10 scoring share sheet:
+            the code to read out, the link to send, and the link visible as
+            text — because `navigator.clipboard` is refused outside a secure
+            context, and a host on a phone hotspot should still be able to
+            read the URL off the screen.
+        --}}
+        <flux:modal name="share-game" class="min-w-[22rem]">
+            <div class="space-y-4">
+                <div class="space-y-1">
+                    <flux:heading size="lg">Invite the table</flux:heading>
+                    <flux:text>
+                        Everyone plays on their own device, on the {{ $layout->name }} sheet.
+                        <span x-show="inLobby">Seats close when you start the game.</span>
+                    </flux:text>
+                </div>
+
+                <div class="rounded-xl bg-zinc-100 py-5 text-center dark:bg-zinc-800">
+                    <div class="font-mono text-4xl font-black tracking-[0.35em] text-zinc-900 dark:text-zinc-50">
+                        {{ $room->code }}
+                    </div>
+                    <div class="mt-1 text-xs font-medium text-zinc-500">
+                        Enter it at {{ parse_url(config('app.url'), PHP_URL_HOST) }}/qwixx
+                    </div>
+                </div>
+
+                <flux:input readonly x-bind:value="shareUrl" x-on:focus="$el.select()" aria-label="Link to this game" />
+
+                <flux:button variant="primary" class="w-full" icon="clipboard" x-on:click="copyCode()">
+                    <span x-text="copied ? 'Copied!' : 'Copy link'">Copy link</span>
+                </flux:button>
+
+                <flux:text class="text-center text-sm" x-show="copyFailed" x-cloak>
+                    This browser wouldn't let the page copy — tap the link above to select it.
+                </flux:text>
+            </div>
+        </flux:modal>
 
         <flux:modal name="reset-confirm" class="min-w-[20rem]">
             <div class="space-y-4">

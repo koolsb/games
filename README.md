@@ -9,6 +9,7 @@ Browser-based helpers for the games on the table, served as one app at
 | `/qwixx` | [Qwixx](https://gamewright.com/product/Qwixx) scoresheets |
 | `/qwixx/room/{code}` | A Qwixx game several people play on their own devices |
 | `/phase10` | [Phase 10](https://en.wikipedia.org/wiki/Phase_10) game generator |
+| `/phase10/play/{code}` | A Phase 10 game one person scores and everyone follows |
 
 Built with **Laravel 13 · Livewire 4 · Flux UI Pro · Tailwind 4 · Alpine.js**. No
 database, no login — each game's data lives in a config file, and Qwixx's game
@@ -101,6 +102,38 @@ tweak and print as a Phase-10-style card.
   fixed seed for reproducible games, per-slot regenerate, and no duplicates.
 - **Printing** is browser-native: `/phase10/print` renders the card and you
   Print → Save as PDF. No headless browser, no server-side PDF engine.
+- **Live scorekeeping** on whatever phases you settled on — see below.
+
+#### Keeping score
+
+One device keeps score; everybody else watches. The scorekeeper names the table
+and picks the phases (the standard 10 or a generated set), and gets a
+four-character code — the same alphabet Qwixx rooms use. Everyone else types
+that code into **Follow a game** on `/phase10`, or opens the shared link, and
+sees the card and the running scores without naming themselves or installing
+anything.
+
+- **A round is entered for everyone at once**, because that's how the table
+  plays: a hand ends, everyone counts the cards left in their hand. Scores
+  start at **0** and nudge in fives (every Phase 10 card value is a multiple of
+  five), so the common case — "I went out, they had nothing" — takes no typing.
+  **Made phase N** is a separate tap from the score, since going out and
+  completing your phase are different things.
+- **Progress is a row of badges**, one per phase, crossed off as a player
+  clears it — the same ✕ the Qwixx sheet uses.
+- **Undo last round** walks the game back, including out of a finished or tied
+  state; status and winner are recomputed from the whole round log every time
+  (`ScoreRoom::settled()`), never patched forward.
+- **Exact ties** on the final phase can't be settled on paper either, so the app
+  says so and takes the result of the replay you play at the table.
+- **Play again, same table** opens a fresh game on a new code with the same
+  players and phases, leaving the finished one readable on its own link.
+
+The scorekeeper is whoever holds the `phase10_host_{code}` cookie set when the
+game was created; every write re-checks it, so a shared link is read-only by
+construction. Games live in the cache under `config('phases.scoring')` —
+`PHASE10_SCORE_CACHE` (default `file`), a 48-hour sliding TTL, 8 players max —
+with the same one-replica caveat Qwixx rooms have.
 
 ## How it fits together
 
