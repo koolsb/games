@@ -71,4 +71,15 @@ return [
         // 'types' => ['set', 'run', 'color', 'color_run', 'evens', 'odds', 'color_evens', 'color_odds'],
     ],
 
+    /*
+    | Server-side storage for scorekeeping games. Shaped like qwixx.php's
+    | 'multiplayer' block — the host edits, anyone with the code can watch.
+    */
+    'scoring' => [
+        'store' => env('PHASE10_SCORE_CACHE', 'file'),
+        'ttl_hours' => 48,
+        'max_players' => 8,
+        'name_max' => 20,
+    ],
+
 ];

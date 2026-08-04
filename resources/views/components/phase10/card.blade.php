@@ -4,6 +4,8 @@
     'subtitle' => null,
     'showBands' => false,
     'size' => 'md',
+    'players' => [],
+    'phaseCount' => null,
 ])
 
 @php
@@ -31,13 +33,31 @@
 
         <ol class="mt-5 {{ $spacing }}">
             @foreach ($phases as $i => $phase)
-                <li class="flex items-baseline gap-2.5 {{ $itemSize }} leading-snug">
-                    <span class="{{ $numW }} shrink-0 text-right font-bold text-white/70 tabular-nums">{{ $i + 1 }}.</span>
-                    <span class="font-semibold">{{ $phase->label }}</span>
-                    @if ($showBands)
-                        <span class="ml-auto shrink-0 self-center rounded-full px-2 py-0.5 {{ $badgeSize }} font-bold tracking-wide uppercase text-white/90 ring-1 ring-white/25">
-                            {{ $phase->band->label() }}
-                        </span>
+                @php
+                    $onThisPhase = $phaseCount
+                        ? collect($players)->filter(fn ($player) => $player->currentPhase($phaseCount) === $i + 1)
+                        : collect();
+                @endphp
+                <li class="{{ $itemSize }} leading-snug">
+                    <div class="flex items-baseline gap-2.5">
+                        <span class="{{ $numW }} shrink-0 text-right font-bold text-white/70 tabular-nums">{{ $i + 1 }}.</span>
+                        <span class="font-semibold">{{ $phase->label }}</span>
+                        @if ($showBands)
+                            <span class="ml-auto shrink-0 self-center rounded-full px-2 py-0.5 {{ $badgeSize }} font-bold tracking-wide uppercase text-white/90 ring-1 ring-white/25">
+                                {{ $phase->band->label() }}
+                            </span>
+                        @endif
+                    </div>
+                    @if ($onThisPhase->isNotEmpty())
+                        <div class="mt-1 flex flex-wrap items-center gap-1">
+                            <span class="{{ $numW }} shrink-0"></span>
+                            @foreach ($onThisPhase as $player)
+                                <span
+                                    class="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white ring-1 ring-white/30"
+                                    title="{{ $player->name }}"
+                                >{{ \Illuminate\Support\Str::of($player->name)->substr(0, 2) }}</span>
+                            @endforeach
+                        </div>
                     @endif
                 </li>
             @endforeach
