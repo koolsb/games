@@ -87,6 +87,7 @@ document.addEventListener('alpine:init', () => {
         busy: false,
         gone: false,
         copied: false,
+        copyFailed: false,
         showStandings: true,
 
         pollTimer: null,
@@ -571,10 +572,13 @@ document.addEventListener('alpine:init', () => {
             try {
                 await navigator.clipboard.writeText(this.shareUrl);
                 this.copied = true;
+                this.copyFailed = false;
                 setTimeout(() => (this.copied = false), 2000);
             } catch {
-                // Clipboard blocked (insecure context, or refused) — the code
-                // is on screen in 3rem type anyway.
+                // Clipboard refused — an insecure context, usually. The share
+                // sheet shows the link as selectable text, so say to use that
+                // rather than leaving the button looking broken.
+                this.copyFailed = true;
             }
         },
 
