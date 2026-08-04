@@ -68,6 +68,11 @@ document.addEventListener('alpine:init', () => {
         // game. One step deep: it exists to fix a slip, not to rewind a game.
         undo: null,
 
+        // The game-over banner lies across the middle rows. Putting it away
+        // is what lets you reach the cells underneath to fix a mistake by
+        // hand; it comes back on its own for the next game over.
+        bannerDismissed: false,
+
         // -- multiplayer ---------------------------------------------------
         multi: mode === 'multi',
         room: roomSnapshot,
@@ -241,6 +246,10 @@ document.addEventListener('alpine:init', () => {
 
         /* Persist locally, then — in multiplayer — tell the table. */
         commit() {
+            // A dismissed banner belongs to one game over. Once play has
+            // resumed, forget it, so the next one is announced properly.
+            if (!this.gameOver) this.bannerDismissed = false;
+
             this.save();
 
             if (this.multi) this.schedulePush();
@@ -523,6 +532,10 @@ document.addEventListener('alpine:init', () => {
                 mode,
                 players: room.mergePlayers(snapshot, this.playerId, mine),
             };
+
+            // Someone else took back the mark that ended the game: the
+            // banner is gone, so a dismissal of it should be too.
+            if (!this.gameOver) this.bannerDismissed = false;
 
             if (index >= 0) this.save();
         },

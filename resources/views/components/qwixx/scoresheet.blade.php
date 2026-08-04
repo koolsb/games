@@ -64,9 +64,14 @@
         <x-qwixx.score-bar :player-index="$p" />
     </div>
 
-    {{-- Game over banner: rendered inside the sheet so it rotates with it in duo mode. --}}
+    {{--
+        Game over banner: rendered inside the sheet so it rotates with it in
+        duo mode. It lies across the middle rows, so it can be put away —
+        otherwise the cells you need to reach to correct a mistake are the
+        ones underneath it.
+    --}}
     <div
-        x-show="gameOver"
+        x-show="gameOver && ! bannerDismissed"
         x-cloak
         class="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-[calc(var(--qx-cell)*0.6)]"
     >
@@ -92,6 +97,17 @@
                     Undo last <span x-text="undo?.label"></span>
                 </flux:button>
 
+                {{-- Put the banner away to get at the sheet underneath. --}}
+                <button
+                    type="button"
+                    class="flex size-7 shrink-0 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white dark:text-zinc-500 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                    aria-label="Hide this and show the sheet"
+                    title="Hide this and show the sheet"
+                    x-on:click="bannerDismissed = true"
+                >
+                    <flux:icon.x-mark class="size-4" />
+                </button>
+
                 {{-- In a room only the host deals the next game, so everyone's
                      sheets clear at the same moment. The condition is baked into
                      the x-show expression rather than wrapped around the tag:
@@ -105,4 +121,16 @@
             </div>
         </div>
     </div>
+
+    {{-- Hiding the banner is not one-way: this brings the result back. It
+         disappears by itself the moment the game is no longer over. --}}
+    <button
+        type="button"
+        x-show="gameOver && bannerDismissed"
+        x-cloak
+        x-on:click="bannerDismissed = false"
+        class="absolute right-[calc(var(--qx-cell)*0.3)] top-[calc(var(--qx-cell)*0.3)] z-10 rounded-full bg-zinc-900/90 px-[calc(var(--qx-cell)*0.3)] py-[calc(var(--qx-cell)*0.08)] text-[calc(var(--qx-cell)*0.22)] font-bold text-white shadow-lg dark:bg-zinc-100/90 dark:text-zinc-900"
+    >
+        Game over — show result
+    </button>
 </div>
