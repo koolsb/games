@@ -62,14 +62,14 @@
                             placeholder="0"
                             size="sm"
                             class="w-20"
-                            wire:model="pending.{{ $player->id }}.score"
+                            wire:model.live="pending.{{ $player->id }}.score"
                             aria-label="{{ $player->name }}'s score this round"
                         />
                         <label class="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-300">
                             <input
                                 type="checkbox"
                                 class="size-4 rounded border-zinc-300 text-zinc-800 focus:ring-zinc-800 dark:border-zinc-600"
-                                wire:model="pending.{{ $player->id }}.completed"
+                                wire:model.live="pending.{{ $player->id }}.completed"
                             >
                             Completed phase
                         </label>

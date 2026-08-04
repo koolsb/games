@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Services\Phase\PhaseLibrary;
+use App\Support\Phase\Phase;
 use Livewire\Livewire;
 
 it('renders the generator page', function (): void {
@@ -48,6 +50,18 @@ it('loads the standard 10 phases', function (): void {
     $component = Livewire::test('phase10::generator')->call('useClassics');
 
     expect($component->get('signatures'))->toHaveCount(10)
+        ->and($component->get('generated'))->toBeTrue();
+});
+
+it('preloads an existing game passed in via the phases query string', function (): void {
+    $signatures = app(PhaseLibrary::class)->classics()
+        ->map(fn (Phase $p): string => $p->signature)
+        ->all();
+
+    $component = Livewire::withQueryParams(['phases' => implode(',', $signatures)])
+        ->test('phase10::generator');
+
+    expect($component->get('signatures'))->toBe($signatures)
         ->and($component->get('generated'))->toBeTrue();
 });
 
