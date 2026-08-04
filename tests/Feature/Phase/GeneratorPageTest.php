@@ -44,6 +44,13 @@ it('removes a phase from the game', function (): void {
     expect($component->get('signatures'))->toHaveCount(9);
 });
 
+it('loads the standard 10 phases', function (): void {
+    $component = Livewire::test('phase10::generator')->call('useClassics');
+
+    expect($component->get('signatures'))->toHaveCount(10)
+        ->and($component->get('generated'))->toBeTrue();
+});
+
 it('adds a single phase with generate one', function (): void {
     $component = Livewire::test('phase10::generator')
         ->call('clear')

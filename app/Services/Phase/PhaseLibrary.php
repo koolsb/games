@@ -61,6 +61,16 @@ final class PhaseLibrary
         return $this->all()->filter(fn (Phase $p): bool => $p->band === $band)->values();
     }
 
+    /**
+     * The 10 phases printed on the official card, in card order.
+     *
+     * @return Collection<int, Phase>
+     */
+    public function classics(): Collection
+    {
+        return $this->all()->filter(fn (Phase $p): bool => $p->source === 'classic')->values();
+    }
+
     public function find(string $signature): ?Phase
     {
         return $this->all()->first(fn (Phase $p): bool => $p->signature === $signature);

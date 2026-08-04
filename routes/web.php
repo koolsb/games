@@ -69,4 +69,16 @@ Route::prefix('qwixx')->name('qwixx.')->group(function () {
 Route::prefix('phase10')->name('phase10.')->group(function () {
     Route::livewire('/', 'phase10::generator')->name('generator');
     Route::get('/print', PrintController::class)->name('print');
+
+    /*
+    | One URL carries a scoring game from setup to the final standings —
+    | same reasoning as Qwixx's room route. It's a plain chromeless view
+    | (like qwixx.room) hosting a single Livewire component that does all
+    | the work; the host is whoever holds the matching
+    | `phase10_host_{code}` cookie set at creation, anyone else who opens
+    | the link gets a read-only, polling view.
+    */
+    Route::get('/play/{code?}', function (?string $code = null) {
+        return view('phase10.play', ['code' => $code]);
+    })->name('play');
 });

@@ -57,6 +57,13 @@ new class extends Component
         $this->applyGame($generator->generateGame($library->all(), $this->options()));
     }
 
+    public function useClassics(PhaseLibrary $library): void
+    {
+        $this->applyGame(new GeneratedGame($library->classics()->all(), seed: null, mode: GenerationMode::from($this->mode)));
+        $this->count = count($this->signatures);
+        $this->syncSlotBands();
+    }
+
     public function generateOne(PhaseGeneratorService $generator, PhaseLibrary $library): void
     {
         $band = $this->mode === GenerationMode::FLAT->value ? DifficultyBand::from($this->band) : null;
@@ -325,12 +332,19 @@ new class extends Component
 
             <flux:button variant="subtle" icon="plus" wire:click="generateOne">Add one phase</flux:button>
 
+            <flux:button variant="ghost" icon="rectangle-stack" wire:click="useClassics">
+                Use the standard 10 phases
+            </flux:button>
+
             @if ($generated && count($this->phases))
                 <flux:button @click="fullscreen = true" variant="subtle" icon="arrows-pointing-out">
                     Full screen
                 </flux:button>
                 <flux:button :href="$this->printUrl()" target="_blank" variant="subtle" icon="printer">
                     Print card
+                </flux:button>
+                <flux:button :href="route('phase10.play', ['phases' => implode(',', $this->signatures)])" variant="subtle" icon="trophy">
+                    Score this game
                 </flux:button>
                 <flux:button variant="ghost" icon="trash" wire:click="clear">Clear</flux:button>
             @endif
