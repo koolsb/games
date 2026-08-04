@@ -274,7 +274,7 @@ new class extends Component
                     <flux:label>Players</flux:label>
                     @foreach ($setupNames as $i => $name)
                         <div class="flex items-center gap-2">
-                            <flux:input wire:model="setupNames.{{ $i }}" placeholder="Player {{ $i + 1 }}" />
+                            <flux:input wire:model.live="setupNames.{{ $i }}" placeholder="Player {{ $i + 1 }}" />
                             @if (count($setupNames) > 2)
                                 <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeSetupName({{ $i }})" tooltip="Remove" />
                             @endif
@@ -300,15 +300,13 @@ new class extends Component
                         </div>
                     @else
                         <flux:text class="text-sm">{{ $this->setupPhases->count() }} phases ready.</flux:text>
-                        <ol class="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 text-sm dark:divide-zinc-800 dark:border-zinc-700">
-                            @foreach ($this->setupPhases as $i => $phase)
-                                <li class="flex gap-2 bg-white px-3 py-2 dark:bg-zinc-900">
-                                    <span class="w-5 text-right font-bold text-zinc-400 tabular-nums">{{ $i + 1 }}.</span>
-                                    <span class="text-zinc-700 dark:text-zinc-200">{{ $phase->label }}</span>
-                                </li>
-                            @endforeach
-                        </ol>
-                        <flux:button :href="route('phase10.generator')" variant="ghost" size="sm" icon="adjustments-horizontal">
+                        <x-phase10.card :phases="$this->setupPhases" :show-bands="true" subtitle="Your game" />
+                        <flux:button
+                            :href="route('phase10.generator', ['phases' => implode(',', $this->setupPhaseSignatures)])"
+                            variant="ghost"
+                            size="sm"
+                            icon="adjustments-horizontal"
+                        >
                             Change phases
                         </flux:button>
                     @endif

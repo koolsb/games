@@ -36,8 +36,23 @@ new class extends Component
     /** @var array{0: int, 1: int} Indices into DifficultyBand::ordered() — 0=Easy, 3=Brutal */
     public array $difficultyRange = [0, 3];
 
-    public function mount(): void
+    public function mount(PhaseLibrary $library): void
     {
+        $phases = request()->query('phases');
+
+        if (is_string($phases) && $phases !== '') {
+            $signatures = array_values(array_filter(
+                explode(',', $phases),
+                static fn (string $sig): bool => $library->find($sig) !== null,
+            ));
+
+            if ($signatures !== []) {
+                $this->signatures = $signatures;
+                $this->count = count($signatures);
+                $this->generated = true;
+            }
+        }
+
         $this->syncSlotBands();
     }
 
