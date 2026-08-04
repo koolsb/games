@@ -34,8 +34,12 @@
         <ol class="mt-5 {{ $spacing }}">
             @foreach ($phases as $i => $phase)
                 @php
+                    /* Players who have cleared every phase would otherwise
+                       pile up on the last one — they are done, not stuck. */
                     $onThisPhase = $phaseCount
-                        ? collect($players)->filter(fn ($player) => $player->currentPhase($phaseCount) === $i + 1)
+                        ? collect($players)
+                            ->reject(fn ($player) => $player->finished($phaseCount))
+                            ->filter(fn ($player) => $player->currentPhase($phaseCount) === $i + 1)
                         : collect();
                 @endphp
                 <li class="{{ $itemSize }} leading-snug">
@@ -53,9 +57,9 @@
                             <span class="{{ $numW }} shrink-0"></span>
                             @foreach ($onThisPhase as $player)
                                 <span
-                                    class="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white ring-1 ring-white/30"
+                                    class="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold tracking-wide text-white ring-1 ring-white/30"
                                     title="{{ $player->name }}"
-                                >{{ \Illuminate\Support\Str::of($player->name)->substr(0, 2) }}</span>
+                                >{{ \Illuminate\Support\Str::limit($player->name, 10, '…') }}</span>
                             @endforeach
                         </div>
                     @endif

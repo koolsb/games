@@ -6,6 +6,7 @@ use App\Http\Controllers\Phase\PrintController;
 use App\Http\Controllers\Qwixx\RoomController;
 use App\Services\Qwixx\LayoutLibrary;
 use App\Services\Qwixx\RoomStore;
+use App\Support\Phase\ScoreRoomCode;
 use App\Support\Qwixx\RoomCode;
 use Illuminate\Support\Facades\Route;
 
@@ -79,6 +80,21 @@ Route::prefix('phase10')->name('phase10.')->group(function () {
     | the link gets a read-only, polling view.
     */
     Route::get('/play/{code?}', function (?string $code = null) {
+        if ($code !== null) {
+            $normalized = ScoreRoomCode::normalize($code);
+
+            abort_unless(ScoreRoomCode::isValid($normalized), 404);
+
+            /*
+            | Codes get shouted across a table and typed back in, so a link
+            | that arrives lowercased or hyphenated should still work —
+            | redirect it to the canonical one rather than 404 on casing.
+            */
+            if ($normalized !== $code) {
+                return redirect()->route('phase10.play', $normalized);
+            }
+        }
+
         return view('phase10.play', ['code' => $code]);
     })->name('play');
 });

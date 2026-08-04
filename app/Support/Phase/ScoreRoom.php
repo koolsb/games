@@ -66,6 +66,23 @@ final readonly class ScoreRoom
         return count($this->phases);
     }
 
+    /**
+     * Rounds are entered for everyone at once, so any player's log length
+     * is the round count.
+     */
+    public function roundsPlayed(): int
+    {
+        return count($this->players[0]->log ?? []);
+    }
+
+    /**
+     * @return list<string> the names of the players in seat order
+     */
+    public function playerNames(): array
+    {
+        return array_map(static fn (ScorePlayer $p): string => $p->name, $this->players);
+    }
+
     public function player(string $id): ?ScorePlayer
     {
         foreach ($this->players as $player) {
