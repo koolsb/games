@@ -29,7 +29,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 3 — Runtime (FrankenPHP, served on :8080 as non-root www-data)
 # ---------------------------------------------------------------------------
-FROM dunglas/frankenphp:php8.4 AS runtime
+FROM dunglas/frankenphp:1.13.1-php8.4 AS runtime
 WORKDIR /app
 
 # FrankenPHP serves /app/public; :8080 (no host) means plain HTTP, no auto-TLS.
