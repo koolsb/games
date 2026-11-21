@@ -10,6 +10,8 @@ Browser-based helpers for the games on the table, served as one app at
 | `/qwixx/room/{code}` | A Qwixx game several people play on their own devices |
 | `/phase10` | [Phase 10](https://en.wikipedia.org/wiki/Phase_10) game generator |
 | `/phase10/play/{code}` | A Phase 10 game one person scores and everyone follows |
+| `/scoreboard` | A score tracker for any game |
+| `/scoreboard/play/{code}` | A scoreboard one person keeps and everyone follows |
 
 Built with **Laravel 13 · Livewire 4 · Flux UI Pro · Tailwind 4 · Alpine.js**. No
 database, no login — each game's data lives in a config file, and Qwixx's game
@@ -135,10 +137,56 @@ construction. Games live in the cache under `config('phases.scoring')` —
 `PHASE10_SCORE_CACHE` (default `file`), a 48-hour sliding TTL, 8 players max —
 with the same one-replica caveat Qwixx rooms have.
 
+### Scoreboard — `/scoreboard`
+
+A score tracker for any game that isn't Qwixx or Phase 10. Name the players
+(up to 12), and the scorekeeper adds points two ways:
+
+- **Tap a player** for a sheet with a number pad, a +/− toggle and ±1/5/10
+  chips — or the card's own **+1 / −1** buttons for counting games.
+- **Score round N** enters everyone's score for the round at once (blank is 0)
+  and moves on to the next round.
+
+A **History** table shows each player's total per round, with a totals row.
+Tapping a cell lets the scorekeeper fix, remove or add to what was entered.
+**Undo** takes back the last thing entered: one quick add, or a whole round,
+which also hands the round number back. **Lowest score wins** flips who leads.
+Players can be renamed, reordered or added mid-game. A player can only be
+removed while they have nothing scored. **New game, same players** starts
+again on a new code.
+
+**The scorekeeper's browser owns the game.** Every tap is written to
+`localStorage` (`scoreboard.games.v1`) before anything touches the network, so
+a refresh, a crashed tab or a dead signal loses nothing. A game can even be
+started with no signal at all; it gets its code once there's a connection, and
+the URL moves to `/scoreboard/play/{code}`. The state is an entry log
+(`resources/js/scoreboard/model.js`). Totals, standings and the history are
+always derived from it, never stored.
+
+Sync (`resources/js/scoreboard/sync.js`) pushes the whole game on every change
+(debounced), and retries with backoff when offline. It also retries on `online`
+and when the tab becomes visible again. The status pill reads Synced, Syncing or
+Offline — saved here. Each push carries the game's revision, and the server only
+keeps a revision higher than the one it holds, so a retry or a late response
+can never roll the game back. If the server has forgotten the game (TTL expired
+or redeployed), the browser registers it again and asks for **the same code
+back**, so links people already have keep working.
+
+Followers open the code or link and poll every 3 seconds (15 seconds in a hidden
+tab). They cache the last snapshot so a refresh with no signal still shows the
+scores. Whether a device is the scorekeeper is decided by its `localStorage`.
+The scorekeeper's token is sent as `X-Scoreboard-Token`, so a shared link is
+read-only by construction.
+
+Server side is the same shape as Phase 10's: `BoardController` (validates and
+rebuilds the pushed game), `BoardStore` (cache, locked writes) and
+`config/scoreboard.php`. The cache is `SCOREBOARD_CACHE` (default `file`) with a
+72-hour sliding TTL, and the same one-replica caveat as the other games.
+
 ## How it fits together
 
 Every game is mounted under a path prefix *and* a matching route-name prefix in
-[`routes/web.php`](routes/web.php) (`qwixx.*`, `phase10.*`), and its landing page
+[`routes/web.php`](routes/web.php) (`qwixx.*`, `phase10.*`, `scoreboard.*`), and its landing page
 is the prefix root. Code is namespaced the same way:
 
 ```
@@ -229,7 +277,7 @@ Open http://localhost:8000.
 
 ```bash
 php artisan test          # Pest (both game domains + pages)
-npm run test              # Vitest (Qwixx rules engine + room sync)
+npm run test              # Vitest (Qwixx engine + room sync, scoreboard model + sync)
 vendor/bin/pint           # format
 ```
 

@@ -47,6 +47,18 @@ return [
             'stripe' => 'phase10-stripe',
         ],
 
+        'scoreboard' => [
+            'name' => 'Scoreboard',
+            'tagline' => 'Score tracker',
+            'summary' => 'Keep score for any game. Name the players, tap to add points, and let '
+                .'everyone at the table follow the totals with a code.',
+            'route' => 'scoreboard.index',
+            'rules_url' => null,
+            'theme' => 'theme-scoreboard',
+            'header' => 'bg-zinc-900',
+            'stripe' => 'games-stripe',
+        ],
+
     ],
 
 ];

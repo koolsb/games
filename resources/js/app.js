@@ -4,3 +4,4 @@
  * never instantiate it, so one bundle serves every route.
  */
 import './qwixx/game';
+import './scoreboard/board';

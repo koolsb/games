@@ -20,4 +20,4 @@ it('gives every game landing page a way back to the menu', function (string $rou
     $this->get(route($route))
         ->assertOk()
         ->assertSee('All games');
-})->with(['qwixx.picker', 'phase10.generator']);
+})->with(['qwixx.picker', 'phase10.generator', 'scoreboard.index']);

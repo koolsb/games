@@ -23,10 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
         */
         // Both patterns: 'qwixx/rooms/*' alone would miss the bare POST that
         // creates a room.
-        $middleware->validateCsrfTokens(except: ['qwixx/rooms', 'qwixx/rooms/*']);
+        // The scoreboard API is the same: the scorekeeper's token is its
+        // only authority, and a scorekeeper's tablet sits on one page for
+        // hours.
+        $middleware->validateCsrfTokens(except: [
+            'qwixx/rooms', 'qwixx/rooms/*',
+            'scoreboard/games', 'scoreboard/games/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*', 'qwixx/rooms', 'qwixx/rooms/*'),
+            fn (Request $request) => $request->is('api/*', 'qwixx/rooms', 'qwixx/rooms/*', 'scoreboard/games', 'scoreboard/games/*'),
         );
     })->create();
