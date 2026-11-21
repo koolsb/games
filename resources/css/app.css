@@ -64,6 +64,14 @@
         --color-accent-foreground: var(--color-white);
     }
 
+    /* Scoreboard isn't tied to any one game's palette, so it takes a
+       neutral teal that sits beside both without borrowing from either. */
+    .theme-scoreboard {
+        --color-accent: var(--color-teal-700);
+        --color-accent-content: var(--color-teal-700);
+        --color-accent-foreground: var(--color-white);
+    }
+
     .dark {
         --color-accent: #3b82f6;
         --color-accent-content: #93c5fd;

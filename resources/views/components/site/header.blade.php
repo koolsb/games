@@ -47,7 +47,7 @@
                 <flux:icon.moon class="size-4" x-show="$flux.dark" x-cloak />
             </flux:button>
 
-            @if ($config)
+            @if ($config['rules_url'] ?? null)
                 <flux:button
                     href="{{ $config['rules_url'] }}"
                     target="_blank"

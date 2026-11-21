@@ -9,7 +9,7 @@
             </flux:text>
         </div>
 
-        <div class="grid gap-6 sm:grid-cols-2">
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {{-- Qwixx: the classic sheet's four rows as the preview. --}}
             <a
                 href="{{ route('qwixx.picker') }}"
@@ -77,6 +77,35 @@
 
                 <span class="mt-auto flex items-center gap-1 pt-1 text-sm font-semibold text-accent-content">
                     Open generator
+                    <flux:icon.arrow-right class="size-4 transition group-hover:translate-x-0.5" />
+                </span>
+            </a>
+
+            {{-- Scoreboard: a miniature of the running totals. --}}
+            <a
+                href="{{ route('scoreboard.index') }}"
+                class="group flex flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200 transition hover:shadow-md hover:ring-zinc-300 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:ring-zinc-700"
+            >
+                <div class="space-y-1">
+                    <flux:heading size="lg" class="font-black">
+                        <x-site.wordmark game="scoreboard" />
+                    </flux:heading>
+                    <flux:text class="text-sm">{{ config('games.games.scoreboard.summary') }}</flux:text>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                    @foreach (['Ann' => 42, 'Ben' => 37, 'Cat' => 29] as $name => $points)
+                        <div @class([
+                            'rounded-lg border px-2 py-1.5',
+                            'border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/30' => $loop->first,
+                            'border-zinc-200 dark:border-zinc-700' => ! $loop->first,
+                        ])>
+                            <div class="truncate text-[10px] font-semibold text-zinc-500">{{ $name }}</div>
+                            <div class="text-lg leading-tight font-black text-zinc-900 tabular-nums dark:text-zinc-50">{{ $points }}</div>
+                        </div>
+                    @endforeach
+                </div>
+                <span class="mt-auto flex items-center gap-1 pt-1 text-sm font-semibold text-accent-content">
+                    Open Scoreboard
                     <flux:icon.arrow-right class="size-4 transition group-hover:translate-x-0.5" />
                 </span>
             </a>

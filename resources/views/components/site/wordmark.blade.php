@@ -13,6 +13,9 @@
         Phase<span class="text-phase-yellow">10</span>
         @break
 
+    @case('scoreboard')
+        Score<span class="text-teal-400">board</span>
+        @break
     @default
         Games
 @endswitch

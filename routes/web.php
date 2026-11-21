@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Phase\PrintController;
 use App\Http\Controllers\Qwixx\RoomController;
+use App\Http\Controllers\Scoreboard\BoardController;
 use App\Services\Qwixx\LayoutLibrary;
 use App\Services\Qwixx\RoomStore;
+use App\Services\Scoreboard\BoardStore;
 use App\Support\Phase\ScoreRoomCode;
 use App\Support\Qwixx\RoomCode;
 use Illuminate\Support\Facades\Route;
@@ -97,4 +99,46 @@ Route::prefix('phase10')->name('phase10.')->group(function () {
 
         return view('phase10.play', ['code' => $code]);
     })->name('play');
+});
+
+Route::prefix('scoreboard')->name('scoreboard.')->group(function () {
+    Route::view('/', 'scoreboard.index')->name('index');
+
+    /*
+    | The play screen. With no code it opens this device's current game —
+    | which may not have a code yet, if it was started with no signal. With
+    | a code, the browser decides whether it is the scorekeeper (it holds
+    | that game's token in localStorage) or a follower; the server can't
+    | know, and doesn't need to. The code is not checked against the store
+    | here, because the scorekeeper must be able to reopen their own game
+    | while offline or after the server copy has expired.
+    */
+    Route::get('/play/{code?}', function (BoardStore $boards, ?string $code = null) {
+        if ($code !== null) {
+            $normalized = ScoreRoomCode::normalize($code);
+
+            abort_unless(ScoreRoomCode::isValid($normalized), 404);
+
+            if ($normalized !== $code) {
+                return redirect()->route('scoreboard.play', $normalized);
+            }
+        }
+
+        // The server's copy, if it has one, so a follower sees the scores on
+        // first paint instead of waiting for the first poll.
+        $board = $code !== null ? $boards->find($code) : null;
+
+        return view('scoreboard.play', ['code' => $code, 'board' => $board?->toClientArray()]);
+    })->name('play');
+
+    /*
+    | The scoreboard API, throttled like the Qwixx room API. Showing is the
+    | followers' polling heartbeat; updating is the scorekeeper's push,
+    | debounced in the browser but still a burst after a spell offline.
+    */
+    Route::prefix('games')->name('games.')->group(function () {
+        Route::post('/', [BoardController::class, 'store'])->middleware('throttle:20,1')->name('store');
+        Route::get('/{code}', [BoardController::class, 'show'])->middleware('throttle:120,1')->name('show');
+        Route::put('/{code}', [BoardController::class, 'update'])->middleware('throttle:300,1')->name('update');
+    });
 });
